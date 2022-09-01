@@ -28,7 +28,7 @@ const ImageCropper: FC<{ src?: string }> = ({ src }) => {
     const _imageContainerRef = imageContainerRef.current as HTMLImageElement;
 
     let newCrop = { x, y, scale };
-    let imageBounds = _imageRef.getBoundingClientRect();
+    let imageBounds = getImageBounds();
     let containerBounds = _imageContainerRef.getBoundingClientRect();
     let originalWidth = _imageRef.clientWidth;
     let widthOverhang = (imageBounds.width - originalWidth) / 2;
@@ -51,8 +51,28 @@ const ImageCropper: FC<{ src?: string }> = ({ src }) => {
     {
       onDrag: ({ offset: [dx, dy] }) =>
         setCrop((previousState) => ({ ...previousState, x: dx, y: dy })),
-      onPinch: ({ offset: [d] }) =>
-        setCrop((previousState) => ({ ...previousState, scale: d })),
+      onPinch: ({
+        memo,
+        offset: [d],
+        origin: [pinchOriginX, pinchOriginY],
+      }) => {
+        memo ??= { bounds: getImageBounds(), crop: { x, y, scale } };
+        const factor = 1;
+        let transformOriginX = memo.bounds.x + memo.bounds.width / 2;
+        let transformOriginY = memo.bounds.y + memo.bounds.height / 2;
+        let displacementX = (transformOriginX - pinchOriginX) / memo.crop.scale;
+        let displacementY = (transformOriginY - pinchOriginY) / memo.crop.scale;
+        let initialOffsetDistance = (memo.crop.scale - 1) * factor;
+        let movementDistance = d - initialOffsetDistance;
+        setCrop((previousState) => ({
+          ...previousState,
+          scale: d / factor,
+          x: memo.crop.x + (displacementX * movementDistance) / factor,
+          y: memo.crop.y + (displacementY * movementDistance) / factor,
+        }));
+
+        return memo;
+      },
       onDragEnd: adjustImage,
       onPinchEnd: adjustImage,
     },
@@ -63,6 +83,9 @@ const ImageCropper: FC<{ src?: string }> = ({ src }) => {
       pinch: { scaleBounds: { min: 1 } },
     }
   );
+
+  const getImageBounds = () =>
+    (imageRef.current as HTMLImageElement).getBoundingClientRect();
 
   return (
     <>
